@@ -1,74 +1,119 @@
 package com.mijuego;
 
-import com.badlogic.gdx.Gdx; //para acceder al teclado, moouse, pantalla, audio, tiempo
-import com.badlogic.gdx.Screen;
-import com.badlogic.gdx.graphics.GL20; //la grafica, para mostrar los frames del juego
-import com.badlogic.gdx.graphics.Texture; //para cargar la imagen del fondo
-import com.badlogic.gdx.graphics.g2d.SpriteBatch; // para dibujar imagenes en pantalla
+import com.badlogic.gdx.Gdx; //para acceder al teclado, mouse, pantalla, audio, tiempo.
+import com.badlogic.gdx.graphics.Texture; //para cargar la imagen del fondo.
+import com.badlogic.gdx.graphics.g2d.SpriteBatch; // para dibujar imagenes en pantalla.
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer; // para dibujar rectangulos.
+import com.badlogic.gdx.utils.Array; // lista dinámica de libgdx.
+import java.util.Random; // para elegir carril aleatorio.
 
-public class PlayGame implements Screen {
-    private Main game;
-    private SpriteBatch batch;
+public class PlayGame extends BaseScreen{
+    private Main juego;
+    private SpriteBatch lote;
+    private ShapeRenderer dibujoPaneles;
+    private Texture flechaArriba;
+    private Texture flechaAbajo;
+    private Texture flechaIzquierda;
+    private Texture flechaDerecha;
 
-    private Texture up;
-    private Texture down;
-    private Texture left;
-    private Texture right;
+    private Array<Flechas> flechas = new Array<>();
+    private float spawnTimer = 0f;
+    private Random rng = new Random();
 
+    private float tamanio = 45f;
+    private float spacing = 55f;
+    private float inicioX;
+    private float golpeY  = 80f;
+    private float panelW  = 65f;
+    private float panelX  = 10f;
 
-    public PlayGame(Main game) {
-        this.game = game;
+    public PlayGame(Main juego) {
+        this.juego = juego;
     }
 
     @Override
     public void show() {
-        batch = new SpriteBatch();
+        lote          = new SpriteBatch();
+        dibujoPaneles = new ShapeRenderer();
+        flechaArriba    = new Texture("flechaUp.png");
+        flechaAbajo     = new Texture("flechaDown.png");
+        flechaIzquierda = new Texture("flechaLeft.png");
+        flechaDerecha   = new Texture("flechaRight.png");
 
-        up = new Texture("flechaUp.png");
-        down = new Texture("flechaDown.png");
-        left = new Texture("flechaLeft.png");
-        right = new Texture("flechaRight.png");
+        float screenWidth = Gdx.graphics.getWidth();
+        float centerX     = screenWidth / 2f;
+        float totalCarriles  = (4 * tamanio) + (3 * spacing);
+        inicioX = centerX - (totalCarriles / 2f);
     }
 
     @Override
-    public void render(float delta) {
+    protected void update(float tiempoFrame) {
+        // Spawn de flechas
+        spawnTimer += tiempoFrame;
+        if (spawnTimer >= 0.8f) {
+            spawnTimer = 0f;
+            int carril = rng.nextInt(4);
+            flechas.add(new Flechas(carril, carrilX(carril), Gdx.graphics.getHeight()));
+        }
 
-        Gdx.gl.glClearColor(0, 0, 0, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        // Mover flechas hacia abajo
+        for (int i = flechas.size - 1; i >= 0; i--) {
+            Flechas a = flechas.get(i);
+            a.mover(220f * tiempoFrame);
+            if (a.getY() + tamanio < 0) flechas.removeIndex(i);
+        }
+    }
 
-        float size = 45;
-        float spacing = 55;
+    @Override
+    protected void draw(float tiempoFrame) {
+        // Dibujar paneles de carril
+        dibujoPaneles.begin(ShapeRenderer.ShapeType.Filled);
+        dibujoPaneles.setColor(0.12f, 0.12f, 0.12f, 1f);
+        for (int carril = 0; carril < 4; carril++) {
+            dibujoPaneles.rect(carrilX(carril) - panelX, 0, panelW, Gdx.graphics.getHeight());
+        }
+        dibujoPaneles.end();
 
-        float screenWidth = Gdx.graphics.getWidth();
-        float centerX = screenWidth / 2f;
+        lote.begin();
 
-        float totalWidth = (4 * size) + (3 * spacing);
-        float startX = centerX - (totalWidth / 2f);
+        // Flechas cayendo
+        for (int i = 0; i < flechas.size; i++) {
 
-        float y = 80;
+            Flechas flecha = flechas.get(i);
+            Texture textura = texFor(flecha.getTipo());
 
-        batch.begin();
+            lote.draw(textura, flecha.getX(), flecha.getY(), tamanio, tamanio);
+        }
 
-        batch.draw(left,  startX + (0 * (size + spacing)), y, size, size);
-        batch.draw(down,  startX + (1 * (size + spacing)), y, size, size);
-        batch.draw(up,    startX + (2 * (size + spacing)), y, size, size);
-        batch.draw(right, startX + (3 * (size + spacing)), y, size, size);
+        // Flechas estáticas (zona de golpe)
+        lote.draw(flechaIzquierda, carrilX(0), golpeY, tamanio, tamanio);
+        lote.draw(flechaAbajo,     carrilX(1), golpeY, tamanio, tamanio);
+        lote.draw(flechaArriba,    carrilX(2), golpeY, tamanio, tamanio);
+        lote.draw(flechaDerecha,   carrilX(3), golpeY, tamanio, tamanio);
 
-        batch.end();
+        lote.end();
     }
 
     @Override
     public void dispose() {
-        batch.dispose();
-
-        up.dispose();
-        down.dispose();
-        left.dispose();
-        right.dispose();
+        lote.dispose();
+        dibujoPaneles.dispose();
+        flechaArriba.dispose();
+        flechaAbajo.dispose();
+        flechaIzquierda.dispose();
+        flechaDerecha.dispose();
     }
 
-    @Override public void resize(int width, int height) {}
-    @Override public void pause() {}
-    @Override public void resume() {}
-    @Override public void hide() {}
+    private float carrilX(int carril) {
+        return inicioX + carril * (tamanio + spacing);
+    }
+
+    private Texture texFor(int tipo) {
+        switch (tipo) {
+            case 0:  return flechaIzquierda;
+            case 1:  return flechaAbajo;
+            case 2:  return flechaArriba;
+            default: return flechaDerecha;
+        }
+    }
 }
